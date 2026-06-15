@@ -1,0 +1,17 @@
+# 数据集（只读数据源 + 脚本生成的中间数据）
+Nuts.v2(DST1506)/
+datasets/
+
+# 训练输出（每次训练重新生成）
+runs/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# 临时模型文件
+*-tmp.pt
+
+# Claude Code 内部文件
+.claude/

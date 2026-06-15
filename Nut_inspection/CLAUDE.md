@@ -2,6 +2,24 @@
 
 ## 项目概述
 基于 YOLOv8 的螺母缺陷检测项目，使用 Anaconda 管理环境，GPU 加速训练。
+当前阶段：YOLOv8n-cls OK/NG 二分类 → STM32N6570 部署。
+
+## 数据来源
+**唯一数据源：** `Nuts.v2(DST1506)/`（只读，不可修改）
+训练用数据由脚本转换生成至 `datasets/nut_classification/`
+
+## 三层记录系统
+| 文件 | 用途 | 更新时机 |
+|------|------|---------|
+| `CLAUDE.md` | 项目环境/架构/训练结果记录 | 每次训练完成后手动同步 |
+| `progress.md` | 会话级进度日志 | 每个操作后实时更新 |
+| `findings.md` | 数据分析、踩坑记录、错误排查 | 发现新信息时追加 |
+
+### 训练结果记录（每次训练后更新）
+| 日期 | 训练名 | 模型 | 数据集 | 最佳指标 | 备注 |
+|------|--------|------|--------|---------|------|
+| 2026-06-15 | train-6 | YOLOv8n | coco8 | mAP50=0.889 | 环境验证 |
+| 2026-06-15 | nut-cls | YOLOv8n-cls | NUT.v2 (5880张) | Top-1 86.3%(val) / 91.7%(test) | 二分类首版基线 |
 
 ## 环境配置
 
@@ -38,23 +56,42 @@ conda activate yolo_env
 
 ```
 Nut_inspection/
-├── yolov8n.pt                    # YOLOv8 Nano 预训练模型 (6.5MB)
+├── yolov8n.pt                    # YOLOv8n 检测预训练模型 (6.5MB)
+├── yolov8n-cls.pt                # YOLOv8n-cls 分类预训练模型 (5.4MB)
+├── Nuts.v2(DST1506)/             # 🔒 原始数据集（只读，唯一数据源）
+│   ├── data.yaml                  # 8类配置
+│   ├── images/{train,valid,test}/ # 5880 张 640×640
+│   └── labels/{train,valid,test}/ # YOLO 检测格式标注
 ├── datasets/
-│   ├── coco8.yaml                # COCO8 数据集配置（80类）
-│   └── coco8/                    # 8张图片：4训练 / 4验证
-│       ├── images/train/         # 训练图片
-│       ├── images/val/           # 验证图片
-│       └── labels/{train,val}/   # YOLO 格式标注
-└── runs/detect/
-    ├── train-6/                  # 最新训练结果 (2026-06-15)
-    │   ├── weights/best.pt       # 验证集最佳模型 (6.5MB)
-    │   ├── weights/last.pt       # 最后一轮模型
-    │   ├── results.png           # 训练曲线图
-    │   ├── results.csv           # 每轮指标数据
-    │   ├── confusion_matrix.png  # 混淆矩阵
-    │   ├── args.yaml             # 训练参数记录
-    │   └── *.jpg                 # 批次可视化图片
-    └── train ~ train-5/          # 之前的训练记录
+│   ├── coco8/                     # COCO8 验证数据（可删）
+│   └── nut_classification/        # 分类工作数据（convert_to_cls.py 生成）
+│       ├── train/{ok,ng}/         # OK 840 + NG 2520
+│       ├── val/{ok,ng}/           # OK 321 + NG 939
+│       └── test/{ok,ng}/          # OK 315 + NG 945
+├── models/
+│   └── nut_cls_fp32.onnx          # ONNX 导出模型 (5.5MB, 1.4M params)
+├── scripts/
+│   ├── convert_to_cls.py          # YOLO 标注 → 分类文件夹
+│   ├── train_classifier.py        # YOLOv8n-cls 训练
+│   ├── evaluate.py                # 评估 + HTML 可视化报告
+│   └── export_for_stm32.py        # ONNX 导出 + 分析
+├── docs/
+│   └── superpowers/
+│       ├── specs/2026-06-15-nut-binary-classifier-design.md
+│       └── plans/2026-06-15-nut-binary-classifier-plan.md
+├── task_plan.md                   # planning-with-files 任务计划
+├── findings.md                    # 研究发现与踩坑记录
+├── progress.md                    # 会话进度日志
+└── runs/
+    ├── detect/train-6/            # COCO8 检测训练
+    └── classify/nut-cls/          # 🔆 分类训练（本次新增）
+        ├── weights/best.pt        # 最佳模型 (3.0MB)
+        ├── weights/last.pt        # 最后一轮
+        ├── results.png            # 训练曲线
+        ├── results.csv            # 每轮指标
+        ├── confusion_matrix.png   # 混淆矩阵
+        ├── eval_metrics.json      # 测试集评估指标
+        └── visual_report.html     # 🌐 可视化报告
 ```
 
 ## 训练命令
@@ -127,3 +164,49 @@ yolo detect train data=datasets/coco8.yaml model=yolov8n.pt epochs=50 device=0
 3. 数据集路径在 `coco8.yaml` 中使用绝对路径，换机器需要修改
 4. 每次训练会在 `runs/detect/` 下创建递增编号的新目录
 5. 模型权重 `.pt` 文件包含完整模型结构和参数，可直接用于推理
+6. **ultralytics 分类模型按字母序排列类别**：`ng`(0) → `ok`(1)，写代码时注意不要硬编码类别顺序
+
+## 螺母分类训练 (nut-cls, 2026-06-15)
+
+### 训练命令
+```python
+from ultralytics import YOLO
+
+model = YOLO('yolov8n-cls.pt')
+results = model.train(
+    data='datasets/nut_classification',  # ImageNet 文件夹格式
+    epochs=50,
+    patience=10,
+    imgsz=224,
+    batch=32,
+    optimizer='AdamW',
+    lr0=1e-3,
+    cos_lr=True,
+    device=0,
+    name='nut-cls',
+    exist_ok=True,
+)
+```
+
+### 测试集评估结果
+| 指标 | 总体 | OK | NG |
+|------|------|----|----|
+| Accuracy | 91.67% | - | - |
+| Precision | 91.34% | 91.75% | 91.34% |
+| Recall | - | 97.67% | 73.65% |
+| F1 | 0.8155 | 0.9462 | 0.8155 |
+
+### 已知问题与改进方向
+1. **NG 召回率偏低 (73.7%)**：约 26% 缺陷被漏检
+   - 原因：OK:NG = 1:3 不均衡 + 数据增强偏强
+   - 改进：OK 类别过采样、降低增强强度、调整学习率
+2. **过拟合**：train loss → 0.003, val loss 震荡
+   - 改进：weight_decay、Dropout
+3. **类别映射**：ultralytics 按字母序 `ng`(0) / `ok`(1)，新手易出错
+
+### ONNX 导出
+```python
+model = YOLO('runs/classify/nut-cls/weights/best.pt')
+model.export(format='onnx', imgsz=224, opset=12, simplify=True)
+```
+导出到 `models/nut_cls_fp32.onnx` (5.5MB)，仅有 Softmax 一个算子 NPU 不兼容（可通过后处理替代）。
