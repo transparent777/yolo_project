@@ -1,0 +1,27 @@
+<annotation>
+	<folder></folder>
+	<filename>20240510_213441_004_jpg.rf.dd918dae6cae767cf6ec6264d2599cea.jpg</filename>
+	<path>20240510_213441_004_jpg.rf.dd918dae6cae767cf6ec6264d2599cea.jpg</path>
+	<source>
+		<database>roboflow.com</database>
+	</source>
+	<size>
+		<width>640</width>
+		<height>640</height>
+		<depth>3</depth>
+	</size>
+	<segmented>0</segmented>
+	<object>
+		<name>Side-Fracture</name>
+		<pose>Unspecified</pose>
+		<truncated>0</truncated>
+		<difficult>0</difficult>
+		<occluded>0</occluded>
+		<bndbox>
+			<xmin>122</xmin>
+			<xmax>552</xmax>
+			<ymin>115</ymin>
+			<ymax>578</ymax>
+		</bndbox>
+	</object>
+</annotation>

@@ -1,0 +1,27 @@
+<annotation>
+	<folder></folder>
+	<filename>20240510_214049_012_jpg.rf.4ba2849227898e7123808f685a79d875.jpg</filename>
+	<path>20240510_214049_012_jpg.rf.4ba2849227898e7123808f685a79d875.jpg</path>
+	<source>
+		<database>roboflow.com</database>
+	</source>
+	<size>
+		<width>640</width>
+		<height>640</height>
+		<depth>3</depth>
+	</size>
+	<segmented>0</segmented>
+	<object>
+		<name>Side_Rust</name>
+		<pose>Unspecified</pose>
+		<truncated>0</truncated>
+		<difficult>0</difficult>
+		<occluded>0</occluded>
+		<bndbox>
+			<xmin>93</xmin>
+			<xmax>572</xmax>
+			<ymin>138</ymin>
+			<ymax>522</ymax>
+		</bndbox>
+	</object>
+</annotation>

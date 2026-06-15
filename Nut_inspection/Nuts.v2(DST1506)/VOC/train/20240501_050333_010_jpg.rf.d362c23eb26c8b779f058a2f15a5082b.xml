@@ -1,0 +1,27 @@
+<annotation>
+	<folder></folder>
+	<filename>20240501_050333_010_jpg.rf.d362c23eb26c8b779f058a2f15a5082b.jpg</filename>
+	<path>20240501_050333_010_jpg.rf.d362c23eb26c8b779f058a2f15a5082b.jpg</path>
+	<source>
+		<database>roboflow.com</database>
+	</source>
+	<size>
+		<width>640</width>
+		<height>640</height>
+		<depth>3</depth>
+	</size>
+	<segmented>0</segmented>
+	<object>
+		<name>Side_Scratches</name>
+		<pose>Unspecified</pose>
+		<truncated>0</truncated>
+		<difficult>0</difficult>
+		<occluded>0</occluded>
+		<bndbox>
+			<xmin>25</xmin>
+			<xmax>522</xmax>
+			<ymin>188</ymin>
+			<ymax>522</ymax>
+		</bndbox>
+	</object>
+</annotation>

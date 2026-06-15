@@ -1,0 +1,27 @@
+<annotation>
+	<folder></folder>
+	<filename>20240501_025346_002_jpg.rf.a9007f620cea8a0b01f755a0092a320d.jpg</filename>
+	<path>20240501_025346_002_jpg.rf.a9007f620cea8a0b01f755a0092a320d.jpg</path>
+	<source>
+		<database>roboflow.com</database>
+	</source>
+	<size>
+		<width>640</width>
+		<height>640</height>
+		<depth>3</depth>
+	</size>
+	<segmented>0</segmented>
+	<object>
+		<name>Fracture</name>
+		<pose>Unspecified</pose>
+		<truncated>0</truncated>
+		<difficult>0</difficult>
+		<occluded>0</occluded>
+		<bndbox>
+			<xmin>96</xmin>
+			<xmax>486</xmax>
+			<ymin>59</ymin>
+			<ymax>601</ymax>
+		</bndbox>
+	</object>
+</annotation>

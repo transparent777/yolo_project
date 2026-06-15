@@ -1,0 +1,27 @@
+<annotation>
+	<folder></folder>
+	<filename>20240430_000316_004_jpg.rf.2ff1c7f8a189e992e1dc92ee20d05ece.jpg</filename>
+	<path>20240430_000316_004_jpg.rf.2ff1c7f8a189e992e1dc92ee20d05ece.jpg</path>
+	<source>
+		<database>roboflow.com</database>
+	</source>
+	<size>
+		<width>640</width>
+		<height>640</height>
+		<depth>3</depth>
+	</size>
+	<segmented>0</segmented>
+	<object>
+		<name>Side_Excellent</name>
+		<pose>Unspecified</pose>
+		<truncated>0</truncated>
+		<difficult>0</difficult>
+		<occluded>0</occluded>
+		<bndbox>
+			<xmin>100</xmin>
+			<xmax>483</xmax>
+			<ymin>256</ymin>
+			<ymax>455</ymax>
+		</bndbox>
+	</object>
+</annotation>
