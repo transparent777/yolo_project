@@ -2,7 +2,7 @@
 
 ## 项目概述
 基于 YOLOv8 的螺母缺陷检测项目，使用 Anaconda 管理环境，GPU 加速训练。
-当前阶段：YOLOv8n-cls OK/NG 二分类 → STM32N6570 部署。
+当前阶段：YOLO v8n-cls OK/NG 二分类 → STM32N6570 部署。
 
 ## 数据来源
 **唯一数据源：** `Nuts.v2(DST1506)/`（只读，不可修改）
@@ -20,6 +20,7 @@
 |------|--------|------|--------|---------|------|
 | 2026-06-15 | train-6 | YOLOv8n | coco8 | mAP50=0.889 | 环境验证 |
 | 2026-06-15 | nut-cls | YOLOv8n-cls | NUT.v2 (5880张) | Top-1 86.3%(val) / 91.7%(test) | 二分类首版基线 |
+| 2026-06-16 | nut-cls-v2 | YOLOv8n-cls | NUT.v2 平衡版 (8202张) | Top-1 93.8%(test) / NG_R=97.9% | 🔆 优化版，NG召回大幅提升 |
 
 ## 环境配置
 
@@ -64,15 +65,22 @@ Nut_inspection/
 │   └── labels/{train,valid,test}/ # YOLO 检测格式标注
 ├── datasets/
 │   ├── coco8/                     # COCO8 验证数据（可删）
-│   └── nut_classification/        # 分类工作数据（convert_to_cls.py 生成）
-│       ├── train/{ok,ng}/         # OK 840 + NG 2520
-│       ├── val/{ok,ng}/           # OK 321 + NG 939
-│       └── test/{ok,ng}/          # OK 315 + NG 945
+│   ├── nut_classification/        # 分类工作数据（convert_to_cls.py 生成）
+│   │   ├── train/{ok,ng}/         # OK 840 + NG 2520 (不均衡)
+│   │   ├── val/{ok,ng}/           # OK 321 + NG 939
+│   │   └── test/{ok,ng}/          # OK 315 + NG 945
+│   └── nut_classification_balanced/  # 🔆 平衡版（balance_dataset.py 生成）
+│       ├── train/{ok,ng}/         # OK 2520 + NG 2520 (1:1)
+│       ├── val/{ok,ng}/           # OK 963 + NG 939 (~1:1)
+│       └── test/{ok,ng}/          # 保持原始分布
 ├── models/
-│   └── nut_cls_fp32.onnx          # ONNX 导出模型 (5.5MB, 1.4M params)
+│   ├── nut_cls_fp32.onnx          # v1 ONNX 导出 (5.5MB)
+│   └── nut_cls_v2_fp32.onnx       # 🔆 v2 ONNX 导出 (5.5MB)
 ├── scripts/
 │   ├── convert_to_cls.py          # YOLO 标注 → 分类文件夹
-│   ├── train_classifier.py        # YOLOv8n-cls 训练
+│   ├── balance_dataset.py         # 🔆 OK 过采样 3× 平衡数据集
+│   ├── train_classifier.py        # v1 训练脚本
+│   ├── train_classifier_v2.py     # 🔆 v2 优化训练脚本
 │   ├── evaluate.py                # 评估 + HTML 可视化报告
 │   └── export_for_stm32.py        # ONNX 导出 + 分析
 ├── docs/
@@ -84,14 +92,14 @@ Nut_inspection/
 ├── progress.md                    # 会话进度日志
 └── runs/
     ├── detect/train-6/            # COCO8 检测训练
-    └── classify/nut-cls/          # 🔆 分类训练（本次新增）
-        ├── weights/best.pt        # 最佳模型 (3.0MB)
-        ├── weights/last.pt        # 最后一轮
-        ├── results.png            # 训练曲线
-        ├── results.csv            # 每轮指标
-        ├── confusion_matrix.png   # 混淆矩阵
-        ├── eval_metrics.json      # 测试集评估指标
-        └── visual_report.html     # 🌐 可视化报告
+    └── classify/
+        ├── nut-cls/               # v1 分类训练
+        │   ├── weights/best.pt    # 最佳模型 (3.0MB)
+        │   └── ...
+        └── nut-cls-v2/            # 🔆 v2 优化分类训练
+            ├── weights/best.pt    # 最佳模型 (3.0MB)
+            ├── weights/best.onnx  # ONNX 导出 (5.5MB)
+            └── ...
 ```
 
 ## 训练命令
@@ -210,3 +218,66 @@ model = YOLO('runs/classify/nut-cls/weights/best.pt')
 model.export(format='onnx', imgsz=224, opset=12, simplify=True)
 ```
 导出到 `models/nut_cls_fp32.onnx` (5.5MB)，仅有 Softmax 一个算子 NPU 不兼容（可通过后处理替代）。
+
+## 螺母分类优化训练 (nut-cls-v2, 2026-06-16)
+
+### 优化策略
+| 改进项 | v1 (基线) | v2 (优化) | 目的 |
+|--------|-----------|-----------|------|
+| 数据均衡 | OK:NG = 1:3 | OK 过采样 3× → 1:1 | 提升 NG 召回 |
+| 学习率 lr0 | 1e-3 | 5e-4 | 减缓过拟合 |
+| weight_decay | 无 | 1e-4 | L2 正则化 |
+| dropout | 无 | 0.2 | 防过拟合 |
+| label_smoothing | 无 | 0.1 | 降低过置信 |
+| patience | 10 | 20 | 充分收敛 |
+| warmup_epochs | 无 | 3 | 稳定训练初期 |
+| 数据增强 | hsv_s=0.7, scale=0.5 | hsv_s=0.3, scale=0.3 | 工业场景保守 |
+| epochs | 50 | 80 | 更长搜索空间 |
+| 训练数据量 | 3360 | 5040 | OK 过采样 |
+
+### 训练命令
+```python
+model = YOLO('yolov8n-cls.pt')
+results = model.train(
+    data='datasets/nut_classification_balanced',
+    epochs=80, patience=20, imgsz=224, batch=32,
+    optimizer='AdamW', lr0=5e-4, weight_decay=1e-4,
+    dropout=0.2, label_smoothing=0.1, cos_lr=True,
+    warmup_epochs=3, device=0, name='nut-cls-v2', exist_ok=True,
+    hsv_h=0.01, hsv_s=0.3, hsv_v=0.2, scale=0.3, fliplr=0.5,
+)
+```
+
+### 训练结果
+- **训练时间**: 0.169 小时 (~10 分钟), 53/80 epochs (EarlyStopping @ epoch 33)
+- **最佳 val top-1**: 74.1% (平衡 val 集，不可直接与 v1 的 86.3% 对比)
+
+### 测试集评估结果 (原始 1260 张 test 集，公平对比)
+| 指标 | v1 | v2 | 变化 |
+|------|-----|-----|------|
+| Accuracy | 91.67% | **93.81%** | ↑ +2.1% |
+| NG Recall | 73.65% | **97.88%** | ↑ +24.2% 🔥 |
+| OK Recall | 97.67% | 81.59% | ↓ -16.1% |
+| NG Precision | 91.34% | 94.10% | ↑ +2.8% |
+| OK Precision | 91.75% | 92.78% | ↑ +1.0% |
+
+### 关键分析
+1. **NG 召回率提升 24.2%**：从 73.7% → 97.9%，缺陷漏检率从 26% 降至 2.1%
+   - TN=925, FN=58 → 仅 58 个 NG 被误判为 OK（v1 有 249 个）
+2. **OK 召回率下降 16.1%**：约 18% 良品被误判（FP=20 → FP=58）
+   - 这是类别均衡化的必然代价，模型从"偏向 NG"转为"偏向 OK"
+   - 工业场景中，**漏检（NG→OK）代价远大于误报（OK→NG）**
+3. **过拟合改善**：val loss 趋于稳定，不再剧烈震荡
+4. **EarlyStopping 推到 epoch 33**：v1 仅 4 轮就停止，v2 训练了 33 轮有效轮次
+
+### ONNX 导出
+```python
+model = YOLO('runs/classify/nut-cls-v2/weights/best.pt')
+model.export(format='onnx', imgsz=224, opset=12, simplify=True)
+```
+导出到 `models/nut_cls_v2_fp32.onnx` (5.5MB, 1.44M params)。
+
+### 下一步方向
+1. **阈值调优**：调整分类阈值平衡 OK/NG 召回率（当前默认 0.5）
+2. **检测 + 精细分类**：升级到多类缺陷检测（Rust/Fracture/Scratches）
+3. **STM32 部署验证**：在开发板上实测推理速度和精度

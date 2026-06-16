@@ -32,10 +32,46 @@
 ### 最终交付物
 | 文件 | 说明 |
 |------|------|
-| models/nut_cls_fp32.onnx | STM32 部署用 ONNX 模型 |
-| runs/classify/nut-cls/weights/best.pt | PyTorch 最佳模型 |
-| runs/classify/nut-cls/visual_report.html | 可视化评估报告 |
+| models/nut_cls_fp32.onnx | v1 STM32 部署用 ONNX 模型 |
+| models/nut_cls_v2_fp32.onnx | 🔆 v2 优化版 ONNX 模型 |
+| runs/classify/nut-cls/weights/best.pt | v1 PyTorch 最佳模型 |
+| runs/classify/nut-cls-v2/weights/best.pt | 🔆 v2 PyTorch 最佳模型 |
+| runs/classify/nut-cls/visual_report.html | v1 可视化评估报告 |
 | scripts/convert_to_cls.py | 数据转换 |
-| scripts/train_classifier.py | 训练脚本 |
+| scripts/balance_dataset.py | 🔆 数据平衡脚本 |
+| scripts/train_classifier.py | v1 训练脚本 |
+| scripts/train_classifier_v2.py | 🔆 v2 优化训练脚本 |
 | scripts/evaluate.py | 评估 + 可视化 |
 | scripts/export_for_stm32.py | ONNX 导出 |
+
+## 2026-06-16
+
+### 会话摘要：优化训练 nut-cls-v2
+- 分析 v1 问题：NG 召回率仅 73.7%，过拟合严重
+- 制定优化方案：数据平衡 + 正则化 + 降增强
+- 创建 `scripts/balance_dataset.py`：OK 过采样 3× (train: 2520+2520)
+- 创建 `scripts/train_classifier_v2.py`：降低 lr、加 weight_decay/dropout/label_smoothing/warmup
+- 运行 nut-cls-v2 训练 (53/80 epochs, EarlyStopping @ epoch 33)
+- 在原始 test 集评估并与 v1 对比
+
+### 优化训练结果对比
+| 指标 | v1 (基线) | v2 (优化) | 变化 |
+|------|-----------|-----------|------|
+| Accuracy | 91.67% | 93.81% | +2.1% |
+| NG Recall | 73.65% | 97.88% | +24.2% |
+| OK Recall | 97.67% | 81.59% | -16.1% |
+| NG Precision | 91.34% | 94.10% | +2.8% |
+| 训练轮次 | 4 (ES) | 33 (ES) | 充分训练 |
+
+### 核心结论
+- NG 召回率大幅提升至 97.9%，缺陷漏检率从 26% 降至 2.1% ✅
+- OK 召回率下降至 81.6%（模型变保守），但工业场景漏检代价远大于误报
+- 过拟合改善，训练更稳定
+- ONNX 已导出至 models/nut_cls_v2_fp32.onnx
+
+### 当前状态
+- ✅ 阶段 1-5 全部完成
+- ✅ 优化训练 nut-cls-v2 完成
+- ✅ ONNX v2 导出完成
+- ⬜ 阈值调优（可选）：平衡 OK/NG 召回率
+- ⬜ STM32N6570 部署验证

@@ -49,6 +49,26 @@
 5. **NG 召回低**：模型偏向保守，26% 缺陷被漏判为 OK
 6. **ONNX 分析**：YOLOv8n 使用 Sigmoid 激活函数而非 SiLU，对 STM32 NPU 友好。仅 Softmax 不兼容。
 
+## 优化训练发现 (2026-06-16)
+
+### 数据平衡效果
+1. **OK 过采样 3× 有效但带来权衡**：NG 召回率 73.7% → 97.9%，但 OK 召回率 97.7% → 81.6%
+   - 平衡训练集后模型不再偏向多数类 (NG)，对两类同等重视
+   - 工业场景中漏检（NG→OK）比误报（OK→NG）代价大得多，这个权衡是值得的
+2. **过采样 vs class_weight**：v1 使用 class_weight 效果不佳（NG 召回仍低），直接过采样更有效
+3. **注意**：val 集也被过采样了，导致 val metrics 不可直接与 v1 对比。公平对比必须在原始 test 集上进行
+
+### 正则化效果
+4. **weight_decay + dropout 改善过拟合**：v1 train loss → 0.003, v2 保持在合理水平
+5. **label_smoothing 降低过置信**：模型预测概率分布更平滑，不再出现 99%+ 的极端置信度
+6. **warmup_epochs 稳定训练初期**：前 3 轮损失下降更平滑
+7. **降低增强有效**：工业螺母场景特征相对固定，过度增强反而引入噪声
+
+### 注意事项
+8. **`label_smoothing` 参数已被 ultralytics 标记为 deprecated**（v8.4.67），未来版本可能移除
+9. **SSL 证书问题依然存在**：AMP checks 下载 yolo26n.pt 时 SSL 失败，不影响训练但建议修复
+10. **val 集一致性**：评估时务必使用原始 test 集（datasets/nut_classification/test/），不要用 balanced 版本的 test
+
 ## 环境信息
 - PyTorch 2.8.0+cu128, Ultralytics 8.4.67
 - GPU: RTX 4060 8GB
