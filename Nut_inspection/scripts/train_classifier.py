@@ -33,6 +33,7 @@ def check_data(data_dir: Path):
     print("=" * 55)
 
 
+
 if __name__ == "__main__":
     # 检查数据
     check_data(DATA_DIR)
@@ -40,7 +41,7 @@ if __name__ == "__main__":
 
     # 加载预训练分类模型
     print("Loading yolov8n-cls.pt (ImageNet pretrained)...")
-    model = YOLO('yolov8n-cls.pt')
+    model = YOLO(str(PROJECT_ROOT / 'yolov8n-cls.pt'))
 
     print(f"\nStarting training...")
     print(f"  Data: {DATA_DIR}")
